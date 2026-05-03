@@ -418,6 +418,11 @@ document.addEventListener("DOMContentLoaded", () => {
     wrapper.className = "media-preview-item";
 
     const url = URL.createObjectURL(file);
+    // createObjectURL always returns blob: URLs; guard against unexpected schemes
+    if (!url.startsWith("blob:")) {
+      URL.revokeObjectURL(url);
+      return;
+    }
     if (isImage) {
       const img = document.createElement("img");
       img.src = url;
@@ -562,11 +567,14 @@ document.addEventListener("DOMContentLoaded", () => {
           canvas.width = Math.round(img.naturalWidth * scale);
           canvas.height = Math.round(img.naturalHeight * scale);
           const ctx = canvas.getContext("2d");
-          if (!ctx) { resolve({ width: img.naturalWidth, height: img.naturalHeight, uniqueColorRatio: 1 }); return; }
+          if (!ctx) {
+            resolve({ width: img.naturalWidth, height: img.naturalHeight, uniqueColorRatio: 1 });
+            return;
+          }
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
           const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
           const colorSet = new Set();
-          const step = 4; // sample every 4th pixel
+          const step = 4; // step over 4 pixels at a time (each pixel = 4 bytes → samples every 16th byte-group)
           for (let i = 0; i < data.length; i += 4 * step) {
             // Quantize to reduce sensor noise
             const r = Math.round(data[i] / 16) * 16;
