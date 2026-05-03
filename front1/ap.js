@@ -232,6 +232,14 @@ document.addEventListener("DOMContentLoaded", () => {
   const defaultBotPlaceholder = "请输入您要判别的内容(支持文本, 图片, 视频)";
 
   const ELEMENT_NODE = Node.ELEMENT_NODE;
+  const isPlaceholderTarget = (node) => {
+    if (!node || node.nodeType !== ELEMENT_NODE) return false;
+    const element = node;
+    return (
+      element.matches?.('input[type="text"], textarea') ||
+      element.querySelector?.('input[type="text"], textarea')
+    );
+  };
   function applyBotPlaceholderToNode(node, placeholder) {
     if (!node || node.nodeType !== ELEMENT_NODE || !placeholder) return;
     const element = node;
@@ -279,17 +287,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
         mutation.addedNodes.forEach((node) => {
-          if (!node || node.nodeType !== ELEMENT_NODE) return;
-          const element = node;
-          if (
-            element.matches?.('input[type="text"], textarea') ||
-            element.querySelector?.('input[type="text"], textarea')
-          ) {
-            pendingNodes.add(element);
-          }
+          if (isPlaceholderTarget(node)) pendingNodes.add(node);
         });
       });
       if (pendingNodes.size && rafId === null) {
+        // Batch placeholder updates to avoid repeated DOM work during mutation bursts.
         rafId = requestAnimationFrame(() => {
           pendingNodes.forEach((node) => applyBotPlaceholderToNode(node, botPlaceholder));
           pendingNodes.clear();
@@ -298,14 +300,12 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
     observer.observe(aiDrawer, { childList: true, subtree: true });
-    window.addEventListener(
-      "beforeunload",
-      () => {
-        if (rafId !== null) cancelAnimationFrame(rafId);
-        observer.disconnect();
-      },
-      { once: true }
-    );
+    const disconnectObserver = () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      observer.disconnect();
+    };
+    window.addEventListener("pagehide", disconnectObserver, { once: true });
+    window.addEventListener("beforeunload", disconnectObserver, { once: true });
   }
 
   on("copyContextBtn", "click", async () => {
