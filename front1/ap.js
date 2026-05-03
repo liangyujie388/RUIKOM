@@ -319,136 +319,202 @@ document.addEventListener("DOMContentLoaded", () => {
     await copyText(ctx);
   });
 
-  // -------- Media Upload & Fraud Detection --------
-  const mediaUploadArea = $("mediaUploadArea");
+  // -------- Chat Interface --------
+  const chatMessages = $("chatMessages");
+  const chatInput = $("chatInput");
+  const chatSendBtn = $("chatSendBtn");
+  const chatAttachBtn = $("chatAttachBtn");
+  const chatAttachmentsPreview = $("chatAttachmentsPreview");
   const mediaFileInput = $("mediaFileInput");
-  const mediaResultSection = $("mediaResultSection");
-  const mediaPreviewContainer = $("mediaPreviewContainer");
-  const mediaRiskBadge = $("mediaRiskBadge");
-  const mediaSignalsEl = $("mediaSignals");
-  const mediaAdviceEl = $("mediaAdvice");
 
-  // Drag-and-drop on the label area
-  if (mediaUploadArea) {
-    mediaUploadArea.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      mediaUploadArea.classList.add("is-dragover");
-    });
-    mediaUploadArea.addEventListener("dragleave", () => {
-      mediaUploadArea.classList.remove("is-dragover");
-    });
-    mediaUploadArea.addEventListener("drop", (e) => {
-      e.preventDefault();
-      mediaUploadArea.classList.remove("is-dragover");
-      handleMediaFiles(e.dataTransfer?.files);
-    });
-  }
+  let pendingFiles = [];
 
+  // Initial AI greeting
+  appendAiMsg(
+    "欢迎使用 <strong>AI 反诈助手</strong>！👋<br>" +
+    "请输入您要判别的内容（文本、链接等），或点击 <strong>📎</strong> 附加图片&nbsp;/&nbsp;视频进行诈骗鉴别。<br>" +
+    "<span class=\"chat-hint\">提示：你可以说「请识别诈骗特征，给出风险等级与应对步骤，并生成劝阻话术与举报建议。」</span>"
+  );
+
+  // Attach button → open file picker
+  chatAttachBtn?.addEventListener("click", () => mediaFileInput?.click());
+
+  // File selection → add to pending list
   mediaFileInput?.addEventListener("change", () => {
-    handleMediaFiles(mediaFileInput.files);
+    Array.from(mediaFileInput.files || []).forEach((f) => pendingFiles.push(f));
+    renderPendingChips();
+    mediaFileInput.value = "";
   });
 
-  on("copyMediaAnalysisBtn", "click", async () => {
-    const risk = (mediaRiskBadge?.textContent || "").trim();
-    const signals = Array.from(mediaSignalsEl?.querySelectorAll("li") || [])
-      .map((li) => (li.textContent || "").trim())
-      .filter(Boolean);
-    const advice = (mediaAdviceEl?.textContent || "").trim();
-    const text = [
-      risk ? `【媒体风险等级】${risk}` : "",
-      signals.length ? `【检测信号】\n${signals.map((s) => `- ${s}`).join("\n")}` : "",
-      advice ? `【诈骗风险提示】\n${advice}` : "",
-      "【我希望你做】请根据以上媒体检测信号，进一步识别诈骗特征，给出应对步骤与举报建议。",
-    ]
-      .filter(Boolean)
-      .join("\n\n");
-    if (!text) return alert("暂无可复制内容，请先上传文件。");
-    await copyText(text);
+  // Auto-resize textarea as user types
+  chatInput?.addEventListener("input", () => {
+    chatInput.style.height = "auto";
+    chatInput.style.height = Math.min(chatInput.scrollHeight, 140) + "px";
   });
 
-  on("clearMediaBtn", "click", () => {
-    mediaResultSection?.classList.add("is-hidden");
-    if (mediaPreviewContainer) mediaPreviewContainer.innerHTML = "";
-    if (mediaFileInput) mediaFileInput.value = "";
-    if (mediaRiskBadge) {
-      mediaRiskBadge.textContent = "LOW";
-      mediaRiskBadge.className = "risk risk--low";
+  // Enter to send (Shift+Enter = newline)
+  chatInput?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendChatMessage();
     }
-    if (mediaSignalsEl) mediaSignalsEl.innerHTML = "";
-    if (mediaAdviceEl) mediaAdviceEl.textContent = "";
   });
 
-  async function handleMediaFiles(files) {
-    if (!files || files.length === 0) return;
-    if (mediaPreviewContainer) mediaPreviewContainer.innerHTML = "";
-    mediaResultSection?.classList.remove("is-hidden");
+  chatSendBtn?.addEventListener("click", sendChatMessage);
 
-    const allResults = [];
-    for (const file of Array.from(files)) {
-      const result = await analyzeMediaFile(file);
-      allResults.push(result);
-      renderMediaPreview(file, result);
-    }
+  // --- render helpers ---
 
-    const totalScore = allResults.reduce((sum, r) => sum + r.score, 0);
-    const avgScore = allResults.length > 0 ? totalScore / allResults.length : 0;
-    const allSignals = allResults.flatMap((r) => r.signals);
-    const uniqueSignals = [...new Set(allSignals)];
-    const risk = calcRisk(avgScore);
-
-    if (mediaRiskBadge) {
-      mediaRiskBadge.textContent = risk.level;
-      mediaRiskBadge.className = `risk ${risk.cls}`;
-    }
-    if (mediaSignalsEl) {
-      mediaSignalsEl.innerHTML = uniqueSignals.length
-        ? uniqueSignals.map((s) => `<li>${escapeHtml(s)}</li>`).join("")
-        : "<li>未发现明显风险特征</li>";
-    }
-    if (mediaAdviceEl) {
-      mediaAdviceEl.textContent = buildMediaAdvice(risk.level, allResults);
-    }
-  }
-
-  function renderMediaPreview(file, _result) {
-    if (!mediaPreviewContainer) return;
-    const isImage = file.type.startsWith("image/");
-    const isVideo = file.type.startsWith("video/");
-    const wrapper = document.createElement("div");
-    wrapper.className = "media-preview-item";
-
-    const url = URL.createObjectURL(file);
-    // createObjectURL always returns blob: URLs; guard against unexpected schemes
-    if (!url.startsWith("blob:")) {
-      URL.revokeObjectURL(url);
+  function renderPendingChips() {
+    if (!chatAttachmentsPreview) return;
+    if (!pendingFiles.length) {
+      chatAttachmentsPreview.classList.add("is-hidden");
+      chatAttachmentsPreview.innerHTML = "";
       return;
     }
-    if (isImage) {
-      const img = document.createElement("img");
-      img.src = url; // lgtm[js/xss-through-dom] — url is a blob: URL validated above
-      img.className = "media-preview__img";
-      img.alt = escapeHtml(file.name);
-      img.onload = () => URL.revokeObjectURL(url);
-      wrapper.appendChild(img);
-    } else if (isVideo) {
-      const video = document.createElement("video");
-      video.src = url; // lgtm[js/xss-through-dom] — url is a blob: URL validated above
-      video.className = "media-preview__video";
-      video.controls = true;
-      video.preload = "metadata";
-      wrapper.appendChild(video);
-    }
+    chatAttachmentsPreview.classList.remove("is-hidden");
+    chatAttachmentsPreview.innerHTML = pendingFiles
+      .map((f, i) => {
+        const icon = f.type.startsWith("image/") ? "\uD83D\uDDBC" : "\uD83C\uDFA5";
+        return (
+          `<div class="chat-attach-chip">` +
+          `${icon} <span>${escapeHtml(f.name)}</span>` +
+          `<button class="chat-attach-chip__remove" data-idx="${i}" type="button" aria-label="\u79FB\u9664\u9644\u4EF6">\u2715</button>` +
+          `</div>`
+        );
+      })
+      .join("");
+    chatAttachmentsPreview.querySelectorAll(".chat-attach-chip__remove").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        pendingFiles.splice(Number(btn.dataset.idx), 1);
+        renderPendingChips();
+      });
+    });
+  }
 
-    const info = document.createElement("div");
-    info.className = "media-preview__info";
-    const nameSpan = document.createElement("span");
-    nameSpan.textContent = file.name;
-    const sizeSpan = document.createElement("span");
-    sizeSpan.textContent = formatFileSize(file.size);
-    info.appendChild(nameSpan);
-    info.appendChild(sizeSpan);
-    wrapper.appendChild(info);
-    mediaPreviewContainer.appendChild(wrapper);
+  function appendAiMsg(html) {
+    if (!chatMessages) return;
+    const el = document.createElement("div");
+    el.className = "chat-msg chat-msg--ai";
+    el.innerHTML =
+      '<div class="chat-msg__avatar">AI</div>' +
+      '<div class="chat-msg__bubble">' + html + '</div>';
+    chatMessages.appendChild(el);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  function appendUserMsg(text, files) {
+    if (!chatMessages) return;
+    const el = document.createElement("div");
+    el.className = "chat-msg chat-msg--user";
+    let mediaHtml = "";
+    if (files.length) {
+      const thumbs = files
+        .map((f) => {
+          const url = URL.createObjectURL(f);
+          if (!url.startsWith("blob:")) return "";
+          if (f.type.startsWith("image/")) {
+            return (
+              `<img src="${url}" class="chat-media-thumb__img"` +
+              ` alt="${escapeHtml(f.name)}" onload="URL.revokeObjectURL(this.src)">`
+            );
+          }
+          if (f.type.startsWith("video/")) {
+            return (
+              `<video src="${url}" class="chat-media-thumb__video"` +
+              ` controls preload="metadata"></video>`
+            );
+          }
+          return `<span class="chat-media-thumb__file">\uD83D\uDCC4 ${escapeHtml(f.name)}</span>`;
+        })
+        .filter(Boolean)
+        .join("");
+      if (thumbs) mediaHtml = `<div class="chat-media-thumb">${thumbs}</div>`;
+    }
+    const textHtml = text ? `<div>${escapeHtml(text)}</div>` : "";
+    el.innerHTML =
+      '<div class="chat-msg__bubble">' + textHtml + mediaHtml + '</div>' +
+      '<div class="chat-msg__avatar">\u6211</div>';
+    chatMessages.appendChild(el);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  function appendThinkingMsg() {
+    if (!chatMessages) return null;
+    const el = document.createElement("div");
+    el.className = "chat-msg chat-msg--ai";
+    el.innerHTML =
+      '<div class="chat-msg__avatar">AI</div>' +
+      '<div class="chat-msg__bubble"><span class="chat-thinking-dots">' +
+      '<span>&middot;</span><span>&middot;</span><span>&middot;</span>' +
+      '</span></div>';
+    chatMessages.appendChild(el);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    return el;
+  }
+
+  async function sendChatMessage() {
+    const text = (chatInput?.value || "").trim();
+    const files = [...pendingFiles];
+    if (!text && !files.length) return;
+
+    if (chatInput) { chatInput.value = ""; chatInput.style.height = "auto"; }
+    pendingFiles = [];
+    renderPendingChips();
+
+    appendUserMsg(text, files);
+    const thinking = appendThinkingMsg();
+
+    if (files.length) {
+      const allResults = [];
+      for (const file of files) {
+        allResults.push(await analyzeMediaFile(file));
+      }
+      thinking?.remove();
+
+      const avgScore = allResults.reduce((s, r) => s + r.score, 0) / allResults.length;
+      const uniqueSignals = [...new Set(allResults.flatMap((r) => r.signals))];
+      const risk = calcRisk(avgScore);
+      const advice = buildMediaAdvice(risk.level, allResults);
+
+      const sigHtml = uniqueSignals.length
+        ? uniqueSignals.map((s) => `<li>${escapeHtml(s)}</li>`).join("")
+        : "<li>\u672A\u53D1\u73B0\u660E\u663E\u98CE\u9669\u7279\u5F81</li>";
+
+      appendAiMsg(
+        `<span class="risk ${risk.cls}" style="display:inline-flex;padding:4px 12px;margin-bottom:8px;">${risk.level}</span>` +
+        `<div class="chat-section-title">\u68C0\u6D4B\u4FE1\u53F7</div><ul class="list">${sigHtml}</ul>` +
+        `<div class="chat-section-title" style="margin-top:8px">\u98CE\u9669\u63D0\u793A</div>` +
+        `<div class="chat-advice-text">${escapeHtml(advice).replace(/\n/g, "<br>")}</div>`
+      );
+    } else {
+      setTimeout(() => {
+        thinking?.remove();
+        appendAiMsg(buildLocalReply(text));
+      }, 600);
+    }
+  }
+
+  function buildLocalReply(text) {
+    let total = 0;
+    const hits = [];
+    rules.forEach((r) => {
+      if (r.hit("", text)) { total += r.score; hits.push(r.msg); }
+    });
+    const risk = calcRisk(total);
+    const advice = buildAdvice(risk.level);
+    if (hits.length) {
+      return (
+        `<span class="risk ${risk.cls}" style="display:inline-flex;padding:4px 12px;margin-bottom:8px;">${risk.level}</span>` +
+        `<div class="chat-section-title">\u547D\u4E2D\u4FE1\u53F7</div>` +
+        `<ul class="list">${hits.map((h) => `<li>${escapeHtml(h)}</li>`).join("")}</ul>` +
+        `<div class="chat-section-title" style="margin-top:8px">\u52DD\u963B\u5EFA\u8BAE</div>` +
+        `<div class="chat-advice-text">${escapeHtml(advice).replace(/\n/g, "<br>")}</div>`
+      );
+    }
+    return (
+      `\u6682\u672A\u547D\u4E2D\u5F3A\u7279\u5F81\u89C4\u5219\uFF0C\u4F46\u8BF7\u4ECD\u4FDD\u6301\u8B66\u60D5\u3002<br>` +
+      `<div class="chat-advice-text">${escapeHtml(buildAdvice("LOW")).replace(/\n/g, "<br>")}</div>`
+    );
   }
 
   async function analyzeMediaFile(file) {
