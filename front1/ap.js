@@ -231,8 +231,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const backdrop = $("backdrop");
   const defaultBotPlaceholder = "请输入您要判别的内容(支持文本, 图片, 视频)";
 
+  const ELEMENT_NODE = Node.ELEMENT_NODE;
   function applyBotPlaceholderToNode(node, placeholder) {
-    if (!node || node.nodeType !== 1 || !placeholder) return;
+    if (!node || node.nodeType !== ELEMENT_NODE || !placeholder) return;
     const element = node;
     if (element.matches?.('input[type="text"], textarea')) {
       if (element.placeholder !== placeholder) element.placeholder = placeholder;
@@ -277,7 +278,16 @@ document.addEventListener("DOMContentLoaded", () => {
     let rafId = null;
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
-        mutation.addedNodes.forEach((node) => pendingNodes.add(node));
+        mutation.addedNodes.forEach((node) => {
+          if (!node || node.nodeType !== ELEMENT_NODE) return;
+          const element = node;
+          if (
+            element.matches?.('input[type="text"], textarea') ||
+            element.querySelector?.('input[type="text"], textarea')
+          ) {
+            pendingNodes.add(element);
+          }
+        });
       });
       if (pendingNodes.size && rafId === null) {
         rafId = requestAnimationFrame(() => {
