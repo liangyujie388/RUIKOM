@@ -288,7 +288,14 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
     observer.observe(aiDrawer, { childList: true, subtree: true });
-    window.addEventListener("beforeunload", () => observer.disconnect(), { once: true });
+    window.addEventListener(
+      "beforeunload",
+      () => {
+        if (rafId !== null) cancelAnimationFrame(rafId);
+        observer.disconnect();
+      },
+      { once: true }
+    );
   }
 
   on("copyContextBtn", "click", async () => {
