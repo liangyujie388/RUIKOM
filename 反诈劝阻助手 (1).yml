@@ -26,12 +26,18 @@ workflow:
       - .GIF
       - .WEBP
       - .SVG
+      - .MP4
+      - .MOV
+      - .AVI
+      - .MKV
+      - .WEBM
       allowed_file_types:
       - image
+      - video
       allowed_file_upload_methods:
       - local_file
       - remote_url
-      enabled: false
+      enabled: true
       fileUploadConfig:
         attachment_image_file_size_limit: 2
         audio_file_size_limit: 50
@@ -44,7 +50,7 @@ workflow:
         video_file_size_limit: 100
         workflow_file_upload_limit: 10
       image:
-        enabled: false
+        enabled: true
         number_limits: 3
         transfer_methods:
         - local_file
@@ -194,7 +200,7 @@ workflow:
           hint: ''
           label: 用户描述/对方话术
           options: []
-          placeholder: ''
+          placeholder: 请输入您要判别的内容(支持文本,图片,视频)
           required: true
           type: text-input
           variable: text
@@ -386,14 +392,15 @@ workflow:
         - id: 90c78c0d-e407-46ab-b648-ad30712cbe11
           role: user
           text: "请根据用户描述判断：\n1) 可能的诈骗类型（可多选）\n2) 风险等级（高/中/低）\n3) 关键风险信号（关键词/句式/行为）\n\
-            4) 用户意图（识别是否诈骗/求助止付/生成劝阻话术/核验身份等）\n\n仅输出 JSON，格式必须完全一致：\n{\n  \"fraud_candidates\"\
-            : [\"类型1\",\"类型2\"],\n  \"risk_level\": \"高\",\n  \"key_signals\": [\"\
-            信号1\",\"信号2\"],\n  \"intent\": \"意图\"\n}\n\n用户描述：\n{{user_input.text}}"
+            4) 用户意图（识别是否诈骗/求助止付/生成劝阻话术/核验身份等）\n\n如用户上传图片或视频，请结合附件内容判断；若无法直接解析视频内容，请说明\
+            限制并建议补充文字描述。\n\n仅输出 JSON，格式必须完全一致：\n{\n  \"fraud_candidates\": [\"类型1\"\
+            ,\"类型2\"],\n  \"risk_level\": \"高\",\n  \"key_signals\": [\"信号1\",\"信号2\
+            \"],\n  \"intent\": \"意图\"\n}\n\n用户描述：\n{{user_input.text}}"
         selected: false
         title: LLM_轻量分类器_JSON
         type: llm
         vision:
-          enabled: false
+          enabled: true
       height: 87
       id: '1777707505741'
       position:
@@ -681,6 +688,8 @@ workflow:
 
             {{user_input.text}}
 
+            如有图片/视频附件，请结合附件内容判断；若无法直接解析视频内容，请说明限制并提示补充关键信息。
+
 
             用户是否已转账/充值：
 
@@ -717,7 +726,7 @@ workflow:
         title: LLM_反诈分析与劝阻生成
         type: llm
         vision:
-          enabled: false
+          enabled: true
       height: 87
       id: '1777708627285'
       position:

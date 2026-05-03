@@ -229,6 +229,16 @@ document.addEventListener("DOMContentLoaded", () => {
   const aiFab = $("aiFab");
   const aiDrawer = $("aiDrawer");
   const backdrop = $("backdrop");
+  const botPlaceholder = "请输入您要判别的内容(支持文本,图片,视频)";
+
+  function applyBotPlaceholder(root) {
+    if (!root) return;
+    root.querySelectorAll("input, textarea").forEach((el) => {
+      if (el.tagName === "TEXTAREA" || el.type === "text") {
+        el.placeholder = botPlaceholder;
+      }
+    });
+  }
 
   function openAi() {
     aiDrawer?.classList.add("is-open");
@@ -250,6 +260,11 @@ document.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeAi();
   });
+  if (aiDrawer) {
+    applyBotPlaceholder(aiDrawer);
+    const observer = new MutationObserver(() => applyBotPlaceholder(aiDrawer));
+    observer.observe(aiDrawer, { childList: true, subtree: true });
+  }
 
   on("copyContextBtn", "click", async () => {
     const ctx = [
