@@ -200,7 +200,7 @@ workflow:
           hint: ''
           label: 用户描述/对方话术
           options: []
-          placeholder: 请输入您要判别的内容(支持文本,图片,视频)
+          placeholder: 请输入您要判别的内容(支持文本, 图片, 视频)
           required: true
           type: text-input
           variable: text

@@ -229,7 +229,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const aiFab = $("aiFab");
   const aiDrawer = $("aiDrawer");
   const backdrop = $("backdrop");
-  const defaultBotPlaceholder = "请输入您要判别的内容(支持文本,图片,视频)";
+  const defaultBotPlaceholder = "请输入您要判别的内容(支持文本, 图片, 视频)";
 
   function applyBotPlaceholderToNode(node, placeholder) {
     if (!node || node.nodeType !== 1 || !placeholder) return;
@@ -273,12 +273,22 @@ document.addEventListener("DOMContentLoaded", () => {
     const botPlaceholder = aiDrawer.dataset.botPlaceholder || defaultBotPlaceholder;
     syncBotPlaceholderText(botPlaceholder);
     applyBotPlaceholderToNode(aiDrawer, botPlaceholder);
+    const pendingNodes = new Set();
+    let rafId = null;
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
-        mutation.addedNodes.forEach((node) => applyBotPlaceholderToNode(node, botPlaceholder));
+        mutation.addedNodes.forEach((node) => pendingNodes.add(node));
       });
+      if (pendingNodes.size && rafId === null) {
+        rafId = requestAnimationFrame(() => {
+          pendingNodes.forEach((node) => applyBotPlaceholderToNode(node, botPlaceholder));
+          pendingNodes.clear();
+          rafId = null;
+        });
+      }
     });
     observer.observe(aiDrawer, { childList: true, subtree: true });
+    window.addEventListener("beforeunload", () => observer.disconnect(), { once: true });
   }
 
   on("copyContextBtn", "click", async () => {
