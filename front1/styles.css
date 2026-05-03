@@ -469,3 +469,120 @@ body{
   opacity: 1;
   pointer-events: auto;
 }
+/* -------- Media Upload & Fraud Detection -------- */
+.media-upload-section {
+  margin-top: 12px;
+  border: 1px solid rgba(110,231,255,.18);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(110,231,255,.04);
+}
+
+.media-upload__title {
+  font-weight: 900;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.media-upload__area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  border: 2px dashed rgba(110,231,255,.30);
+  border-radius: 12px;
+  padding: 20px 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+}
+
+.media-upload__area:hover,
+.media-upload__area.is-dragover {
+  border-color: rgba(110,231,255,.70);
+  background: rgba(110,231,255,.08);
+}
+
+.media-upload__icon {
+  font-size: 26px;
+}
+
+.media-upload__text {
+  font-size: 13px;
+  color: rgba(255,255,255,.88);
+}
+
+.media-upload__hint {
+  font-size: 11px;
+  color: rgba(255,255,255,.50);
+}
+
+/* visually hidden but still functional */
+.media-upload__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+/* Results section */
+.media-result-section {
+  margin-top: 12px;
+}
+
+.media-preview-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.media-preview-item {
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(0,0,0,.22);
+}
+
+.media-preview__img {
+  width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+  display: block;
+  background: rgba(0,0,0,.28);
+}
+
+.media-preview__video {
+  width: 100%;
+  max-height: 200px;
+  display: block;
+  background: rgba(0,0,0,.28);
+}
+
+.media-preview__info {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 10px;
+  font-size: 11px;
+  color: rgba(255,255,255,.60);
+  gap: 8px;
+}
+
+.media-preview__info span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-result {
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(0,0,0,.18);
+}
+
+.media-result__risk {
+  margin-bottom: 8px;
+}
