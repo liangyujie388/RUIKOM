@@ -319,6 +319,325 @@ document.addEventListener("DOMContentLoaded", () => {
     await copyText(ctx);
   });
 
+  // -------- Media Upload & Fraud Detection --------
+  const mediaUploadArea = $("mediaUploadArea");
+  const mediaFileInput = $("mediaFileInput");
+  const mediaResultSection = $("mediaResultSection");
+  const mediaPreviewContainer = $("mediaPreviewContainer");
+  const mediaRiskBadge = $("mediaRiskBadge");
+  const mediaSignalsEl = $("mediaSignals");
+  const mediaAdviceEl = $("mediaAdvice");
+
+  // Drag-and-drop on the label area
+  if (mediaUploadArea) {
+    mediaUploadArea.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      mediaUploadArea.classList.add("is-dragover");
+    });
+    mediaUploadArea.addEventListener("dragleave", () => {
+      mediaUploadArea.classList.remove("is-dragover");
+    });
+    mediaUploadArea.addEventListener("drop", (e) => {
+      e.preventDefault();
+      mediaUploadArea.classList.remove("is-dragover");
+      handleMediaFiles(e.dataTransfer?.files);
+    });
+  }
+
+  mediaFileInput?.addEventListener("change", () => {
+    handleMediaFiles(mediaFileInput.files);
+  });
+
+  on("copyMediaAnalysisBtn", "click", async () => {
+    const risk = (mediaRiskBadge?.textContent || "").trim();
+    const signals = Array.from(mediaSignalsEl?.querySelectorAll("li") || [])
+      .map((li) => (li.textContent || "").trim())
+      .filter(Boolean);
+    const advice = (mediaAdviceEl?.textContent || "").trim();
+    const text = [
+      risk ? `【媒体风险等级】${risk}` : "",
+      signals.length ? `【检测信号】\n${signals.map((s) => `- ${s}`).join("\n")}` : "",
+      advice ? `【诈骗风险提示】\n${advice}` : "",
+      "【我希望你做】请根据以上媒体检测信号，进一步识别诈骗特征，给出应对步骤与举报建议。",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+    if (!text) return alert("暂无可复制内容，请先上传文件。");
+    await copyText(text);
+  });
+
+  on("clearMediaBtn", "click", () => {
+    mediaResultSection?.classList.add("is-hidden");
+    if (mediaPreviewContainer) mediaPreviewContainer.innerHTML = "";
+    if (mediaFileInput) mediaFileInput.value = "";
+    if (mediaRiskBadge) {
+      mediaRiskBadge.textContent = "LOW";
+      mediaRiskBadge.className = "risk risk--low";
+    }
+    if (mediaSignalsEl) mediaSignalsEl.innerHTML = "";
+    if (mediaAdviceEl) mediaAdviceEl.textContent = "";
+  });
+
+  async function handleMediaFiles(files) {
+    if (!files || files.length === 0) return;
+    if (mediaPreviewContainer) mediaPreviewContainer.innerHTML = "";
+    mediaResultSection?.classList.remove("is-hidden");
+
+    const allResults = [];
+    for (const file of Array.from(files)) {
+      const result = await analyzeMediaFile(file);
+      allResults.push(result);
+      renderMediaPreview(file, result);
+    }
+
+    const totalScore = allResults.reduce((sum, r) => sum + r.score, 0);
+    const avgScore = allResults.length > 0 ? totalScore / allResults.length : 0;
+    const allSignals = allResults.flatMap((r) => r.signals);
+    const uniqueSignals = [...new Set(allSignals)];
+    const risk = calcRisk(avgScore);
+
+    if (mediaRiskBadge) {
+      mediaRiskBadge.textContent = risk.level;
+      mediaRiskBadge.className = `risk ${risk.cls}`;
+    }
+    if (mediaSignalsEl) {
+      mediaSignalsEl.innerHTML = uniqueSignals.length
+        ? uniqueSignals.map((s) => `<li>${escapeHtml(s)}</li>`).join("")
+        : "<li>未发现明显风险特征</li>";
+    }
+    if (mediaAdviceEl) {
+      mediaAdviceEl.textContent = buildMediaAdvice(risk.level, allResults);
+    }
+  }
+
+  function renderMediaPreview(file, _result) {
+    if (!mediaPreviewContainer) return;
+    const isImage = file.type.startsWith("image/");
+    const isVideo = file.type.startsWith("video/");
+    const wrapper = document.createElement("div");
+    wrapper.className = "media-preview-item";
+
+    const url = URL.createObjectURL(file);
+    if (isImage) {
+      const img = document.createElement("img");
+      img.src = url;
+      img.className = "media-preview__img";
+      img.alt = escapeHtml(file.name);
+      img.onload = () => URL.revokeObjectURL(url);
+      wrapper.appendChild(img);
+    } else if (isVideo) {
+      const video = document.createElement("video");
+      video.src = url;
+      video.className = "media-preview__video";
+      video.controls = true;
+      video.preload = "metadata";
+      wrapper.appendChild(video);
+    }
+
+    const info = document.createElement("div");
+    info.className = "media-preview__info";
+    const nameSpan = document.createElement("span");
+    nameSpan.textContent = file.name;
+    const sizeSpan = document.createElement("span");
+    sizeSpan.textContent = formatFileSize(file.size);
+    info.appendChild(nameSpan);
+    info.appendChild(sizeSpan);
+    wrapper.appendChild(info);
+    mediaPreviewContainer.appendChild(wrapper);
+  }
+
+  async function analyzeMediaFile(file) {
+    const isImage = file.type.startsWith("image/");
+    const signals = [];
+    let score = 0;
+
+    // Rule 1: File type vs extension mismatch
+    const extMatch = file.name.match(/\.(\w+)$/i);
+    const ext = extMatch ? extMatch[1].toLowerCase() : "";
+    const imageExts = ["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp"];
+    const videoExts = ["mp4", "mov", "avi", "mkv", "webm"];
+    if (file.type.startsWith("image/") && videoExts.includes(ext)) {
+      signals.push("文件扩展名与实际类型不符（可能伪装成视频的图片）");
+      score += 30;
+    } else if (file.type.startsWith("video/") && imageExts.includes(ext)) {
+      signals.push("文件扩展名与实际类型不符（可能伪装成图片的视频）");
+      score += 30;
+    }
+
+    // Rule 2: Suspicious filename keywords
+    const fname = file.name.toLowerCase();
+    if (/screenshot|截图|屏幕|screen_shot|screenrecord/.test(fname)) {
+      signals.push("文件名含截图/录屏标识，可能为聊天截图（常见于伪造转账记录）");
+      score += 20;
+    }
+    if (/转账|汇款|receipt|bank|付款|支付|transfer/.test(fname)) {
+      signals.push("文件名含支付/转账关键词，警惕伪造的支付凭证");
+      score += 25;
+    }
+    if (/公安|警察|法院|检察|证件|certificate|official|police/.test(fname)) {
+      signals.push("文件名含执法/证件关键词，警惕伪造的官方文件");
+      score += 30;
+    }
+    if (/身份证|护照|passport|id_card|identity|idcard/.test(fname)) {
+      signals.push("文件名含证件关键词，警惕身份信息盗用或伪造证件");
+      score += 25;
+    }
+    if (/temp|tmp|unknown|untitled|新建文件|new_file/.test(fname)) {
+      signals.push("文件名为临时/无意义名称，可能为批量生成的欺诈素材");
+      score += 10;
+    }
+
+    // Rule 3: Very recent last-modified time (within 5 minutes)
+    const modAge = Date.now() - file.lastModified;
+    if (modAge < 5 * 60 * 1000) {
+      signals.push("文件修改时间极近（5 分钟内），可能为临时伪造的截图/证明");
+      score += 15;
+    }
+
+    // Rule 4: Abnormal file size
+    if (isImage && file.size < 5 * 1024) {
+      signals.push("图片文件极小（< 5 KB），可能为低质量伪造图或异常缩略图");
+      score += 10;
+    }
+    if (isImage && file.size > 50 * 1024 * 1024) {
+      signals.push("图片文件异常大（> 50 MB），请核实文件真实性");
+      score += 10;
+    }
+
+    // Rule 5: Canvas-based image analysis (dimensions & color diversity)
+    if (isImage && file.type !== "image/svg+xml") {
+      try {
+        const imgInfo = await analyzeImageCanvas(file);
+        if (imgInfo.width && imgInfo.height) {
+          // Common mobile screenshot resolutions
+          const mobileRes = [
+            [1080, 1920], [1080, 2340], [1080, 2400], [750, 1334],
+            [828, 1792], [1170, 2532], [1284, 2778], [720, 1280],
+            [1440, 3200], [1440, 3120], [1080, 2160], [1080, 2280],
+          ];
+          const isMobileShot = mobileRes.some(
+            ([w, h]) =>
+              (imgInfo.width === w && imgInfo.height === h) ||
+              (imgInfo.width === h && imgInfo.height === w)
+          );
+          if (isMobileShot) {
+            signals.push(
+              `检测到典型手机截图分辨率（${imgInfo.width}×${imgInfo.height}），可能为聊天/支付截图，请核实内容真实性`
+            );
+            score += 20;
+          }
+          // Portrait ratio typical of phone screenshots
+          const ratio = imgInfo.height / imgInfo.width;
+          if (!isMobileShot && ratio > 1.7 && imgInfo.width < 1400) {
+            signals.push("图片比例符合手机截图特征，请核实其内容真实性");
+            score += 10;
+          }
+          // Low color diversity → likely a flat/fake document or screenshot
+          if (imgInfo.uniqueColorRatio < 0.008) {
+            signals.push("图片色彩多样性极低，可能为截图或 P 图制作的伪造文件");
+            score += 15;
+          }
+        }
+      } catch {
+        // Ignore canvas errors (e.g., cross-origin or tainted canvas)
+      }
+    }
+
+    return { score, signals };
+  }
+
+  async function analyzeImageCanvas(file) {
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        try {
+          const maxSample = 200;
+          const scale = Math.min(
+            1,
+            maxSample / Math.max(img.naturalWidth, img.naturalHeight)
+          );
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.round(img.naturalWidth * scale);
+          canvas.height = Math.round(img.naturalHeight * scale);
+          const ctx = canvas.getContext("2d");
+          if (!ctx) { resolve({ width: img.naturalWidth, height: img.naturalHeight, uniqueColorRatio: 1 }); return; }
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+          const colorSet = new Set();
+          const step = 4; // sample every 4th pixel
+          for (let i = 0; i < data.length; i += 4 * step) {
+            // Quantize to reduce sensor noise
+            const r = Math.round(data[i] / 16) * 16;
+            const g = Math.round(data[i + 1] / 16) * 16;
+            const b = Math.round(data[i + 2] / 16) * 16;
+            colorSet.add(`${r},${g},${b}`);
+          }
+          const totalSamples = data.length / 4 / step;
+          resolve({
+            width: img.naturalWidth,
+            height: img.naturalHeight,
+            uniqueColorRatio: colorSet.size / totalSamples,
+          });
+        } catch {
+          resolve({ width: img.naturalWidth, height: img.naturalHeight, uniqueColorRatio: 1 });
+        }
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve({});
+      };
+      img.src = url;
+    });
+  }
+
+  function buildMediaAdvice(level, results) {
+    const hasPayment = results.some((r) =>
+      r.signals.some((s) => /支付|转账|凭证/.test(s))
+    );
+    const hasOfficial = results.some((r) =>
+      r.signals.some((s) => /执法|官方|证件/.test(s))
+    );
+    const isScreenshot = results.some((r) =>
+      r.signals.some((s) => /截图|手机截图|录屏/.test(s))
+    );
+
+    const lines = [];
+    if (level === "HIGH") {
+      lines.push("⚠️ 高风险：该媒体文件具有多项诈骗典型特征，请高度警惕。");
+    } else if (level === "MID") {
+      lines.push("⚠️ 中风险：该媒体文件存在可疑特征，请仔细核实来源。");
+    } else {
+      lines.push("ℹ️ 未发现明显高危特征，但仍建议核实文件来源与真实性。");
+    }
+    if (hasPayment) {
+      lines.push(
+        "🔴 发现疑似支付凭证：诈骗分子常伪造转账截图诱导受害者误以为交易已完成。请通过官方 App 或银行短信核实到账，切勿仅凭截图确认收款。"
+      );
+    }
+    if (hasOfficial) {
+      lines.push(
+        "🔴 发现疑似官方文件：公安/法院/银行不会通过网络发送「证件」要求操作。任何此类文件均应通过官方渠道独立核实。"
+      );
+    }
+    if (isScreenshot) {
+      lines.push(
+        "🟡 截图内容可被篡改：P 图工具可轻易伪造聊天记录/付款截图。请要求对方提供可独立核实的原始凭证。"
+      );
+    }
+    lines.push(
+      "建议：将文件发给家人/朋友一同判断，或拨打全国反诈热线 96110 进行咨询举报。"
+    );
+    return lines.join("\n");
+  }
+
+  function formatFileSize(bytes) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
   // 额外：如果你想在别的地方调用 openAi，可用 window.__openAi()
   window.__openAi = openAi;
 });
