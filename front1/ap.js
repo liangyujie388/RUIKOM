@@ -231,9 +231,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const backdrop = $("backdrop");
   const defaultBotPlaceholder = "请输入您要判别的内容(支持文本, 图片, 视频)";
 
-  const ELEMENT_NODE = Node.ELEMENT_NODE;
   const isPlaceholderTarget = (node) => {
-    if (!node || node.nodeType !== ELEMENT_NODE) return false;
+    if (!node || node.nodeType !== Node.ELEMENT_NODE) return false;
     const element = node;
     return (
       element.matches?.('input[type="text"], textarea') ||
@@ -241,7 +240,7 @@ document.addEventListener("DOMContentLoaded", () => {
     );
   };
   function applyBotPlaceholderToNode(node, placeholder) {
-    if (!node || node.nodeType !== ELEMENT_NODE || !placeholder) return;
+    if (!node || node.nodeType !== Node.ELEMENT_NODE || !placeholder) return;
     const element = node;
     if (element.matches?.('input[type="text"], textarea')) {
       if (element.placeholder !== placeholder) element.placeholder = placeholder;
@@ -302,6 +301,7 @@ document.addEventListener("DOMContentLoaded", () => {
     observer.observe(aiDrawer, { childList: true, subtree: true });
     const disconnectObserver = () => {
       if (rafId !== null) cancelAnimationFrame(rafId);
+      pendingNodes.clear();
       observer.disconnect();
     };
     window.addEventListener("pagehide", disconnectObserver, { once: true });
