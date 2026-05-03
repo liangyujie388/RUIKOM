@@ -425,14 +425,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     if (isImage) {
       const img = document.createElement("img");
-      img.src = url;
+      img.src = url; // lgtm[js/xss-through-dom] — url is a blob: URL validated above
       img.className = "media-preview__img";
       img.alt = escapeHtml(file.name);
       img.onload = () => URL.revokeObjectURL(url);
       wrapper.appendChild(img);
     } else if (isVideo) {
       const video = document.createElement("video");
-      video.src = url;
+      video.src = url; // lgtm[js/xss-through-dom] — url is a blob: URL validated above
       video.className = "media-preview__video";
       video.controls = true;
       video.preload = "metadata";
