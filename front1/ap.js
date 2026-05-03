@@ -229,6 +229,33 @@ document.addEventListener("DOMContentLoaded", () => {
   const aiFab = $("aiFab");
   const aiDrawer = $("aiDrawer");
   const backdrop = $("backdrop");
+  const defaultBotPlaceholder = "请输入您要判别的内容(支持文本, 图片, 视频)";
+
+  const isPlaceholderTarget = (node) => {
+    if (!node || node.nodeType !== Node.ELEMENT_NODE) return false;
+    const element = node;
+    return (
+      element.matches?.('input[type="text"], textarea') ||
+      element.querySelector?.('input[type="text"], textarea')
+    );
+  };
+  function applyBotPlaceholderToNode(node, placeholder) {
+    if (!node || node.nodeType !== Node.ELEMENT_NODE || !placeholder) return;
+    const element = node;
+    if (element.matches?.('input[type="text"], textarea')) {
+      if (element.placeholder !== placeholder) element.placeholder = placeholder;
+    }
+    element.querySelectorAll?.('input[type="text"], textarea').forEach((el) => {
+      if (el.placeholder !== placeholder) el.placeholder = placeholder;
+    });
+  }
+
+  function syncBotPlaceholderText(placeholder) {
+    if (!placeholder) return;
+    document.querySelectorAll("[data-bot-placeholder-text]").forEach((el) => {
+      el.textContent = placeholder;
+    });
+  }
 
   function openAi() {
     aiDrawer?.classList.add("is-open");
@@ -250,6 +277,36 @@ document.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeAi();
   });
+  if (aiDrawer) {
+    const botPlaceholder = aiDrawer.dataset.botPlaceholder || defaultBotPlaceholder;
+    syncBotPlaceholderText(botPlaceholder);
+    applyBotPlaceholderToNode(aiDrawer, botPlaceholder);
+    const pendingNodes = new Set();
+    let rafId = null;
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => {
+          if (isPlaceholderTarget(node)) pendingNodes.add(node);
+        });
+      });
+      if (pendingNodes.size && rafId === null) {
+        // Batch placeholder updates to avoid repeated DOM work during mutation bursts.
+        rafId = requestAnimationFrame(() => {
+          pendingNodes.forEach((node) => applyBotPlaceholderToNode(node, botPlaceholder));
+          pendingNodes.clear();
+          rafId = null;
+        });
+      }
+    });
+    observer.observe(aiDrawer, { childList: true, subtree: true });
+    const disconnectObserver = () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      pendingNodes.clear();
+      observer.disconnect();
+    };
+    window.addEventListener("pagehide", disconnectObserver, { once: true });
+    window.addEventListener("beforeunload", disconnectObserver, { once: true });
+  }
 
   on("copyContextBtn", "click", async () => {
     const ctx = [
