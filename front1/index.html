@@ -224,69 +224,24 @@
         </div>
       </div>
 
-      <div class="ai-drawer__body">
-        <div class="ai-note">
-          <div>聊天输入提示：<span class="mono" data-bot-placeholder-text></span></div>
-          <div>
-            你可以对 AI 说：<span class="mono">“请识别诈骗特征，给出风险等级与应对步骤，并生成劝阻话术与举报建议。”</span>
-          </div>
-        </div>
+      <!-- Chat messages area -->
+      <div class="chat-messages" id="chatMessages"></div>
 
-        <!-- 图片 / 视频上传与诈骗鉴别 -->
-        <div class="media-upload-section">
-          <div class="media-upload__title">📁 上传图片 / 视频进行诈骗鉴别</div>
-          <label class="media-upload__area" id="mediaUploadArea" for="mediaFileInput">
-            <span class="media-upload__icon">⬆</span>
-            <span class="media-upload__text">拖放或点击上传图片 / 视频</span>
-            <span class="media-upload__hint">支持：JPG · PNG · GIF · WEBP · MP4 · MOV · AVI · WEBM（最大 100 MB）</span>
-          </label>
-          <input
-            type="file"
-            id="mediaFileInput"
-            class="media-upload__input"
-            accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml,video/mp4,video/quicktime,video/x-msvideo,video/x-matroska,video/webm"
-            multiple
-          />
+      <!-- Pending attachment previews (shown above input bar) -->
+      <div class="chat-attachments-preview is-hidden" id="chatAttachmentsPreview"></div>
 
-          <div id="mediaResultSection" class="media-result-section is-hidden">
-            <div id="mediaPreviewContainer" class="media-preview-container"></div>
-            <div class="media-result">
-              <div class="media-result__risk">
-                <span id="mediaRiskBadge" class="risk risk--low">LOW</span>
-              </div>
-              <div class="card__title">检测信号</div>
-              <ul id="mediaSignals" class="list"></ul>
-              <div class="card__title" style="margin-top: 10px">风险提示</div>
-              <div id="mediaAdvice" class="advice"></div>
-              <div class="row" style="margin-top: 10px">
-                <button class="btn btn--ghost" id="copyMediaAnalysisBtn" type="button">复制给 AI</button>
-                <button class="btn btn--ghost" id="clearMediaBtn" type="button">清除</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 这里有两种接入方式：iframe / Dify embed 脚本 -->
-        <div class="ai-embed">
-          <div class="ai-embed__title">Dify Chat（嵌入区）</div>
-
-          <!-- 方式A：iframe（更容易固定在侧边栏）
-          <iframe
-            class="ai-iframe"
-            src="https://udify.app/chatbot/YOUR_TOKEN"
-            frameborder="0"
-            loading="lazy"
-          ></iframe>
-          -->
-
-          <div class="ai-embed__placeholder">
-            你还未接入 Dify。<br />
-            1）去 Dify 应用 → 发布/内嵌（Embed）复制代码<br />
-            2）粘贴到本页 body 底部（见下方注释）<br />
-            或使用 iframe 方式替换上面的 src。<br />
-            输入提示：<span data-bot-placeholder-text></span>
-          </div>
-        </div>
+      <!-- Chat input bar -->
+      <div class="chat-input-bar">
+        <input
+          type="file"
+          id="mediaFileInput"
+          class="media-upload__input"
+          accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml,video/mp4,video/quicktime,video/x-msvideo,video/x-matroska,video/webm"
+          multiple
+        />
+        <button class="chat-attach-btn" id="chatAttachBtn" type="button" title="上传图片 / 视频附件" aria-label="上传图片或视频附件">📎</button>
+        <textarea class="chat-textarea" id="chatInput" placeholder="请输入您要判别的内容…" rows="1"></textarea>
+        <button class="chat-send-btn" id="chatSendBtn" type="button" aria-label="发送消息">↑</button>
       </div>
     </aside>
 
