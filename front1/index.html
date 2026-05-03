@@ -207,7 +207,12 @@
     </button>
 
     <!-- AI 侧边面板（点右下角打开） -->
-    <aside class="ai-drawer" id="aiDrawer" aria-hidden="true">
+    <aside
+      class="ai-drawer"
+      id="aiDrawer"
+      aria-hidden="true"
+      data-bot-placeholder="请输入您要判别的内容(支持文本,图片,视频)"
+    >
       <div class="ai-drawer__head">
         <div>
           <div class="ai-drawer__title">AI 反诈助手</div>
@@ -221,7 +226,7 @@
 
       <div class="ai-drawer__body">
         <div class="ai-note">
-          聊天输入提示：<span class="mono">请输入您要判别的内容(支持文本,图片,视频)</span><br />
+          聊天输入提示：<span class="mono" data-bot-placeholder-text></span><br />
           你可以对 AI 说：<span class="mono">“请识别诈骗特征，给出风险等级与应对步骤，并生成劝阻话术与举报建议。”</span>
         </div>
 
@@ -243,7 +248,7 @@
             1）去 Dify 应用 → 发布/内嵌（Embed）复制代码<br />
             2）粘贴到本页 body 底部（见下方注释）<br />
             或使用 iframe 方式替换上面的 src。<br />
-            输入提示：请输入您要判别的内容(支持文本,图片,视频)
+            输入提示：<span data-bot-placeholder-text></span>
           </div>
         </div>
       </div>

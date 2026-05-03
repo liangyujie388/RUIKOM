@@ -229,14 +229,23 @@ document.addEventListener("DOMContentLoaded", () => {
   const aiFab = $("aiFab");
   const aiDrawer = $("aiDrawer");
   const backdrop = $("backdrop");
-  const botPlaceholder = "请输入您要判别的内容(支持文本,图片,视频)";
+  const defaultBotPlaceholder = "请输入您要判别的内容(支持文本,图片,视频)";
 
-  function applyBotPlaceholder(root) {
-    if (!root) return;
-    root.querySelectorAll("input, textarea").forEach((el) => {
-      if (el.tagName === "TEXTAREA" || el.type === "text") {
-        el.placeholder = botPlaceholder;
-      }
+  function applyBotPlaceholderToNode(node, placeholder) {
+    if (!node || node.nodeType !== 1 || !placeholder) return;
+    const element = node;
+    if (element.matches?.('input[type="text"], textarea')) {
+      if (element.placeholder !== placeholder) element.placeholder = placeholder;
+    }
+    element.querySelectorAll?.('input[type="text"], textarea').forEach((el) => {
+      if (el.placeholder !== placeholder) el.placeholder = placeholder;
+    });
+  }
+
+  function syncBotPlaceholderText(placeholder) {
+    if (!placeholder) return;
+    document.querySelectorAll("[data-bot-placeholder-text]").forEach((el) => {
+      el.textContent = placeholder;
     });
   }
 
@@ -261,8 +270,14 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.key === "Escape") closeAi();
   });
   if (aiDrawer) {
-    applyBotPlaceholder(aiDrawer);
-    const observer = new MutationObserver(() => applyBotPlaceholder(aiDrawer));
+    const botPlaceholder = aiDrawer.dataset.botPlaceholder || defaultBotPlaceholder;
+    syncBotPlaceholderText(botPlaceholder);
+    applyBotPlaceholderToNode(aiDrawer, botPlaceholder);
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => applyBotPlaceholderToNode(node, botPlaceholder));
+      });
+    });
     observer.observe(aiDrawer, { childList: true, subtree: true });
   }
 
